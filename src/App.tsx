@@ -19,7 +19,7 @@ export default function App() {
   useEffect(() => {
     const activeElement = document.activeElement;
     if (
-      (status === 'results' || status === 'success' || status === 'empty') &&
+      (status === 'results' || status === 'success' || status === 'empty' || status === 'error') &&
       (activeElement === document.body ||
         activeElement?.matches(':disabled') ||
         activeElement?.closest('form[role="search"]'))
@@ -71,7 +71,7 @@ export default function App() {
               <CurrentWeather city={data.city} current={data.current} unit={unit} />
             ) : (
               <EmptyState
-                hint="Os dados atuais não estão disponíveis para esta cidade."
+                hint={`Os dados atuais não estão disponíveis para ${data.city.name}.`}
                 title="Clima atual indisponível"
               />
             )}

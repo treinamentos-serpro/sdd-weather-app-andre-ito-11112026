@@ -102,19 +102,21 @@ describe('App', () => {
     expect(screen.getByText('76,5 °F')).toBeVisible();
   });
 
-  it('shows unavailable weather separately from a missing city', async () => {
+  it('identifies the selected city when current weather is unavailable', async () => {
     vi.mocked(searchCities).mockResolvedValue([mockWeatherData.city]);
     vi.mocked(getWeather).mockResolvedValue({
       ...mockWeatherData,
       current: undefined,
-      forecastDays: [],
+      forecastDays: [mockWeatherData.forecastDays[0]],
     });
     const user = userEvent.setup();
     render(<App />);
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
     await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
-    expect(await screen.findByRole('heading', { name: 'Clima indisponível' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Clima atual indisponível' })).toBeVisible();
+    expect(screen.getByText('Os dados atuais não estão disponíveis para São Paulo.')).toBeVisible();
+    expect(screen.getAllByRole('article')).toHaveLength(1);
   });
 
   it('retries the failed weather request without repeating the search', async () => {
@@ -128,6 +130,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
     await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Falha de rede.');
+    expect(screen.getByRole('region', { name: 'Resultado da previsão' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(await screen.findByRole('region', { name: 'Clima atual em São Paulo' })).toBeVisible();
     expect(searchCities).toHaveBeenCalledTimes(1);
