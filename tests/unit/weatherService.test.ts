@@ -57,7 +57,7 @@ describe('searchCities', () => {
   });
 
   it('preserves punctuation, Unicode and markup characters in one encoded query parameter', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
     vi.stubGlobal('fetch', fetchMock);
     const query = "D'Água-<img src=x> & região";
 
@@ -71,13 +71,21 @@ describe('searchCities', () => {
     expect(fetchMock.mock.calls[0][0]).toContain(encodeURIComponent(query));
   });
 
-  it('returns an empty list when results are absent or empty', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ results: [] }) });
+  it('returns an empty list for valid no-match responses', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ results: null }) });
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(searchCities('cidade')).resolves.toEqual([]);
     await expect(searchCities('cidade')).resolves.toEqual([]);
+  });
+
+  it('rejects a geocoding response without a results field', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+    await expect(searchCities('cidade')).rejects.toBeInstanceOf(WeatherServiceError);
   });
 
   it('handles null results and omits unavailable city fields', async () => {
@@ -140,7 +148,7 @@ describe('fetch timeout and network errors', () => {
     },
   ];
 
-  it.each(requests)('aborts $name after 10 seconds and clears the timer', async ({ run }) => {
+  it.each(requests)('aborts $name after 8 seconds and clears the timer', async ({ run }) => {
     vi.useFakeTimers();
     let signal: AbortSignal | undefined;
     vi.stubGlobal(
@@ -159,7 +167,7 @@ describe('fetch timeout and network errors', () => {
     const assertion = expect(result).rejects.toEqual(
       new WeatherServiceError('A requisição demorou demais.'),
     );
-    await vi.advanceTimersByTimeAsync(9_999);
+    await vi.advanceTimersByTimeAsync(7_999);
     expect(signal?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await assertion;
@@ -186,7 +194,7 @@ describe('fetch timeout and network errors', () => {
     const assertion = expect(result).rejects.toEqual(
       new WeatherServiceError('A requisição demorou demais.'),
     );
-    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(8_000);
     await assertion;
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -209,7 +217,10 @@ describe('fetch timeout and network errors', () => {
 
   it('clears the timer when the request succeeds', async () => {
     vi.useFakeTimers();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) }),
+    );
 
     await expect(searchCities('São Paulo')).resolves.toEqual([]);
     expect(vi.getTimerCount()).toBe(0);

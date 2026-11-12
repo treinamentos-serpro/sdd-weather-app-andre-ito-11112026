@@ -11,7 +11,7 @@ describe('ForecastList', () => {
     expect(articles).toHaveLength(5);
 
     const firstDay = within(articles[0]);
-    expect(firstDay.getByRole('heading', { name: /11 de nov\./i })).toBeVisible();
+    expect(firstDay.getByRole('heading', { name: '11/11/2026' })).toBeVisible();
     expect(firstDay.getByRole('img', { name: 'Parcialmente nublado' })).toBeVisible();
     expect(firstDay.getByText('26,4 °C')).toBeVisible();
     expect(firstDay.getByText('18,2 °C')).toBeVisible();

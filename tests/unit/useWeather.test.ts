@@ -40,11 +40,9 @@ describe('useWeather', () => {
     expect(result.current.status).toBe('idle');
   });
 
-  it('loads the first city and allows selecting another', async () => {
+  it('shows search results without loading weather and loads only the selected city', async () => {
     vi.mocked(searchCities).mockResolvedValue([firstCity, secondCity]);
-    vi.mocked(getWeather)
-      .mockResolvedValueOnce(weather)
-      .mockResolvedValueOnce({ ...weather, city: secondCity });
+    vi.mocked(getWeather).mockResolvedValue({ ...weather, city: secondCity });
     const { result } = renderHook(() => useWeather());
 
     let pending: Promise<void> = Promise.resolve();
@@ -54,17 +52,17 @@ describe('useWeather', () => {
     expect(result.current.status).toBe('loading');
     await act(() => pending);
     expect(searchCities).toHaveBeenCalledWith('São Paulo');
-    expect(getWeather).toHaveBeenCalledWith(firstCity);
+    expect(getWeather).not.toHaveBeenCalled();
     expect(result.current).toMatchObject({
-      status: 'success',
+      status: 'results',
       cities: [firstCity, secondCity],
-      data: weather,
+      data: null,
       query: 'São Paulo',
       error: null,
     });
 
     await act(() => result.current.selectCity(secondCity));
-    expect(getWeather).toHaveBeenLastCalledWith(secondCity);
+    expect(getWeather).toHaveBeenCalledExactlyOnceWith(secondCity);
     expect(result.current.data?.city).toEqual(secondCity);
   });
 
@@ -95,7 +93,9 @@ describe('useWeather', () => {
     });
     await act(() => result.current.retry());
     expect(searchCities).toHaveBeenCalledTimes(2);
-    expect(result.current).toMatchObject({ status: 'success', error: null, data: weather });
+    expect(result.current).toMatchObject({ status: 'results', error: null, data: null });
+    await act(() => result.current.selectCity(firstCity));
+    expect(result.current).toMatchObject({ status: 'success', data: weather });
   });
 
   it('retries failed weather without repeating the city search', async () => {
@@ -105,6 +105,7 @@ describe('useWeather', () => {
       .mockResolvedValueOnce(weather);
     const { result } = renderHook(() => useWeather());
     await act(() => result.current.search('São Paulo'));
+    await act(() => result.current.selectCity(firstCity));
     expect(result.current).toMatchObject({
       status: 'error',
       error: 'Falha de rede.',
@@ -116,10 +117,13 @@ describe('useWeather', () => {
     expect(result.current).toMatchObject({ status: 'success', error: null, data: weather });
   });
 
-  it('does not request weather for a city without coordinates', async () => {
+  it('keeps cities without coordinates in results but prevents their weather request', async () => {
     vi.mocked(searchCities).mockResolvedValue([{ name: 'Cidade' }]);
     const { result } = renderHook(() => useWeather());
     await act(() => result.current.search('Cidade'));
+    expect(result.current).toMatchObject({ status: 'results', cities: [{ name: 'Cidade' }] });
+    expect(getWeather).not.toHaveBeenCalled();
+    await act(() => result.current.selectCity({ name: 'Cidade' }));
     expect(result.current).toMatchObject({
       status: 'error',
       error: 'Coordenadas da cidade indisponíveis.',
@@ -159,12 +163,12 @@ describe('useWeather', () => {
       await firstRequest;
     });
     expect(result.current).toMatchObject({
-      status: 'success',
+      status: 'results',
       query: 'Segunda',
       cities: [secondCity],
-      data: { city: secondCity },
+      data: null,
     });
-    expect(getWeather).toHaveBeenCalledTimes(1);
+    expect(getWeather).not.toHaveBeenCalled();
   });
 
   it('ignores stale weather after another city is selected', async () => {
@@ -179,9 +183,10 @@ describe('useWeather', () => {
       )
       .mockResolvedValueOnce({ ...weather, city: secondCity });
     const { result } = renderHook(() => useWeather());
+    await act(() => result.current.search('São Paulo'));
     let firstRequest: Promise<void> = Promise.resolve();
     await act(async () => {
-      firstRequest = result.current.search('São Paulo');
+      firstRequest = result.current.selectCity(firstCity);
       await Promise.resolve();
     });
     await act(() => result.current.selectCity(secondCity));

@@ -35,6 +35,17 @@ describe('CurrentWeather', () => {
     expect(screen.getByText('1.013,2 hPa')).toBeVisible();
   });
 
+  it('shows the source observation time in the city local format', () => {
+    render(
+      <CurrentWeather
+        city={city}
+        current={{ ...current, time: '2026-11-11T12:15:00-03:00' }}
+        unit="celsius"
+      />,
+    );
+    expect(screen.getByText(/Atualizado em/)).toHaveTextContent('Atualizado em 11/11/2026 12:15');
+  });
+
   it('formats the hero temperature in the selected unit', () => {
     render(<CurrentWeather city={city} current={current} unit="fahrenheit" />);
 

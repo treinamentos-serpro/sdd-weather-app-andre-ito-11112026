@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import CityResults from './components/CityResults';
 import CurrentWeather from './components/CurrentWeather';
 import ForecastList from './components/ForecastList';
 import SearchBar from './components/SearchBar';
@@ -13,12 +14,12 @@ export default function App() {
   const [unit, setUnit] = useState<Unit>('celsius');
   const resultRef = useRef<HTMLDivElement>(null);
 
-  const { status, data, error, query, search, retry } = useWeather();
+  const { status, data, cities, error, query, search, selectCity, retry } = useWeather();
 
   useEffect(() => {
     const activeElement = document.activeElement;
     if (
-      (status === 'success' || status === 'empty') &&
+      (status === 'results' || status === 'success' || status === 'empty') &&
       (activeElement === document.body ||
         activeElement?.matches(':disabled') ||
         activeElement?.closest('form[role="search"]'))
@@ -38,6 +39,8 @@ export default function App() {
         );
       case 'loading':
         return null;
+      case 'results':
+        return <CityResults cities={cities} onSelect={selectCity} />;
       case 'empty':
         if (data) {
           return (

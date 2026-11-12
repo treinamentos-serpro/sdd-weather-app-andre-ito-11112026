@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getWeather, searchCities, WeatherServiceError } from '../services/weatherService';
 import type { City, WeatherData } from '../types/weather';
 
-type Status = 'idle' | 'loading' | 'success' | 'error' | 'empty';
+type Status = 'idle' | 'loading' | 'results' | 'success' | 'error' | 'empty';
 type Operation = { type: 'search'; name: string } | { type: 'weather'; city: City };
 
 export function useWeather() {
@@ -69,7 +69,7 @@ export function useWeather() {
         setStatus('empty');
         return;
       }
-      await loadWeather(results[0], activeRequestId);
+      setStatus('results');
     } catch (reason) {
       if (activeRequestId !== requestId.current) return;
       setError(

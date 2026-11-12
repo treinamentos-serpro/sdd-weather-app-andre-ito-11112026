@@ -14,7 +14,7 @@ async function fetchWithTimeout(url: string): Promise<unknown> {
     timeout = setTimeout(() => {
       controller.abort();
       reject(new WeatherServiceError('A requisição demorou demais.'));
-    }, 10_000);
+    }, 8_000);
   });
 
   try {
@@ -86,8 +86,7 @@ export async function searchCities(name: string): Promise<City[]> {
   const data = await fetchWithTimeout(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=pt&format=json`,
   );
-  if (typeof data !== 'object' || data === null || !('results' in data)) {
-    if (typeof data === 'object' && data !== null) return [];
+  if (!isRecord(data) || !('results' in data)) {
     throw new WeatherServiceError('Resposta de geocodificação inválida.');
   }
   if (data.results == null) return [];

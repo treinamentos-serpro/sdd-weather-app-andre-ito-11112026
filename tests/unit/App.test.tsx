@@ -43,6 +43,9 @@ describe('App', () => {
     await act(async () => {
       resolveSearch([mockWeatherData.city]);
     });
+    expect(screen.getByRole('button', { name: /São Paulo/ })).toBeVisible();
+    expect(getWeather).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /São Paulo/ }));
     expect(await screen.findByRole('region', { name: 'Clima atual em São Paulo' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Resultado da previsão' })).toHaveAttribute(
       'aria-busy',
@@ -89,9 +92,9 @@ describe('App', () => {
     vi.mocked(getWeather).mockResolvedValue(mockWeatherData);
     const user = userEvent.setup();
     render(<App />);
-
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     await screen.findByRole('region', { name: 'Clima atual em São Paulo' });
 
     await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
@@ -108,9 +111,9 @@ describe('App', () => {
     });
     const user = userEvent.setup();
     render(<App />);
-
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     expect(await screen.findByRole('heading', { name: 'Clima indisponível' })).toBeVisible();
   });
 
@@ -121,9 +124,9 @@ describe('App', () => {
       .mockResolvedValueOnce(mockWeatherData);
     const user = userEvent.setup();
     render(<App />);
-
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Falha de rede.');
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(await screen.findByRole('region', { name: 'Clima atual em São Paulo' })).toBeVisible();
@@ -136,9 +139,9 @@ describe('App', () => {
     vi.mocked(getWeather).mockResolvedValue(mockWeatherData);
     const user = userEvent.setup();
     render(<App />);
-
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     await screen.findByRole('region', { name: 'Clima atual em São Paulo' });
     await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
     expect(screen.getByText('76,5 °F')).toBeVisible();
@@ -157,9 +160,9 @@ describe('App', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-
     await user.type(screen.getByRole('searchbox', { name: 'Cidade' }), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.click(await screen.findByRole('button', { name: /São Paulo/ }));
     await waitFor(() => expect(getWeather).toHaveBeenCalledOnce());
     expect(screen.getByRole('status')).toHaveTextContent('Buscando previsão');
     await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
@@ -206,8 +209,10 @@ describe('App', () => {
       screen.queryByRole('heading', { name: 'Nenhuma cidade encontrada' }),
     ).not.toBeInTheDocument();
     expect(getWeather).not.toHaveBeenCalled();
-
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByRole('button', { name: /São Paulo/ })).toBeVisible();
+    expect(getWeather).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /São Paulo/ }));
     expect(await screen.findByRole('region', { name: 'Clima atual em São Paulo' })).toBeVisible();
     expect(searchCities).toHaveBeenCalledTimes(2);
     expect(getWeather).toHaveBeenCalledOnce();
