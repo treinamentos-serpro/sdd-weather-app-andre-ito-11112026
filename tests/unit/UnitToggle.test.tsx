@@ -1,51 +1,95 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect } from 'vitest';
 import { useState } from 'react';
-import UnitToggle from '../../src/components/UnitToggle';
+import { describe, expect, it, vi } from 'vitest';
 import CurrentWeather from '../../src/components/CurrentWeather';
-import type { City, CurrentWeather as CurrentWeatherType, Unit } from '../../src/types/weather';
+import UnitToggle from '../../src/components/UnitToggle';
+import type { Unit } from '../../src/types/weather';
 
-const city: City = {
-  id: 1,
-  name: 'Seattle',
-  country: 'Estados Unidos',
-  admin1: 'Washington',
-  latitude: 47.6,
-  longitude: -122.33,
-};
-
-const current: CurrentWeatherType = {
-  time: '2026-06-16T12:00',
-  temperature: 0, // 0°C => 32°F (fácil de verificar)
-  humidity: 80,
-  windSpeed: 10,
-  pressure: 1015,
-  precipitation: 0,
-  weatherCode: 3,
-};
-
-function Harness() {
+function StatefulUnitToggle() {
   const [unit, setUnit] = useState<Unit>('celsius');
+
+  return <UnitToggle unit={unit} onChange={setUnit} />;
+}
+
+function WeatherWithUnitToggle() {
+  const [unit, setUnit] = useState<Unit>('celsius');
+
   return (
     <>
       <UnitToggle unit={unit} onChange={setUnit} />
-      <CurrentWeather city={city} current={current} unit={unit} />
+      <CurrentWeather
+        city={{ name: 'São Paulo' }}
+        current={{ time: '2026-11-11T12:00', temperatureC: 0 }}
+        unit={unit}
+      />
     </>
   );
 }
 
-describe('UnitToggle + CurrentWeather', () => {
-  it('converte a temperatura ao alternar a unidade', async () => {
-    render(<Harness />);
-    expect(screen.getByText('0°')).toBeInTheDocument();
+describe('UnitToggle', () => {
+  it('exposes a named group and the selected unit with aria-pressed', () => {
+    render(<UnitToggle onChange={vi.fn()} unit="celsius" />);
 
-    await userEvent.click(screen.getByRole('button', { name: '°F' }));
-    expect(screen.getByText('32°')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Unidade de temperatura' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Fahrenheit' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
-  it('expõe os botões com estado pressionado acessível', () => {
-    render(<Harness />);
-    expect(screen.getByRole('button', { name: '°C' })).toHaveAttribute('aria-pressed', 'true');
+  it('calls onChange when a unit button is activated', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(<UnitToggle onChange={onChange} unit="celsius" />);
+    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith('fahrenheit');
+  });
+
+  it('updates current weather from 0 °C to 32 °F and back', async () => {
+    const user = userEvent.setup();
+    render(<WeatherWithUnitToggle />);
+
+    expect(screen.getByRole('region', { name: 'Clima atual em São Paulo' })).toHaveTextContent(
+      '0,0 °C',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+    expect(screen.getByRole('region', { name: 'Clima atual em São Paulo' })).toHaveTextContent(
+      '32,0 °F',
+    );
+    await user.click(screen.getByRole('button', { name: 'Celsius' }));
+    expect(screen.getByRole('region', { name: 'Clima atual em São Paulo' })).toHaveTextContent(
+      '0,0 °C',
+    );
+  });
+
+  it('moves focus and changes selection with arrow keys', async () => {
+    const user = userEvent.setup();
+
+    render(<StatefulUnitToggle />);
+    const celsiusButton = screen.getByRole('button', { name: 'Celsius' });
+    const fahrenheitButton = screen.getByRole('button', { name: 'Fahrenheit' });
+
+    celsiusButton.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(fahrenheitButton).toHaveFocus();
+    expect(fahrenheitButton).toHaveAttribute('aria-pressed', 'true');
+    expect(celsiusButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('activates the focused unit with Space', async () => {
+    const user = userEvent.setup();
+
+    render(<StatefulUnitToggle />);
+    const fahrenheitButton = screen.getByRole('button', { name: 'Fahrenheit' });
+    fahrenheitButton.focus();
+    await user.keyboard(' ');
+
+    expect(fahrenheitButton).toHaveAttribute('aria-pressed', 'true');
   });
 });

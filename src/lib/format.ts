@@ -1,44 +1,66 @@
-/**
- * Funções puras de formatação de datas para a previsão.
- */
+const dayLabelFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'UTC',
+});
 
-const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const MONTHS = [
-  'Jan',
-  'Fev',
-  'Mar',
-  'Abr',
-  'Mai',
-  'Jun',
-  'Jul',
-  'Ago',
-  'Set',
-  'Out',
-  'Nov',
-  'Dez',
-];
+export function formatDayLabel(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return 'Data indisponível';
+  }
 
-/** Faz parse de uma data ISO (YYYY-MM-DD) como data local, sem fuso. */
-function parseLocalDate(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number);
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
+  const [, year, month, day] = match;
+  const dateValue = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+
+  if (
+    dateValue.getUTCFullYear() !== Number(year) ||
+    dateValue.getUTCMonth() !== Number(month) - 1 ||
+    dateValue.getUTCDate() !== Number(day)
+  ) {
+    return 'Data indisponível';
+  }
+
+  return dayLabelFormatter.format(dateValue);
 }
 
-/**
- * Rótulo do dia relativo a "hoje":
- * - índice 0 → "Hoje"
- * - índice 1 → "Amanhã"
- * - demais → dia da semana abreviado
- */
-export function getDayLabel(iso: string, index: number): string {
-  if (index === 0) return 'Hoje';
-  if (index === 1) return 'Amanhã';
-  const date = parseLocalDate(iso);
-  return WEEKDAYS[date.getDay()];
-}
+export function formatDateTime(value: string | undefined): string {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.exec(
+      value ?? '',
+    );
+  if (!match) {
+    return 'Indisponível';
+  }
 
-/** Formata a data como "12 Jun". */
-export function getShortDate(iso: string): string {
-  const date = parseLocalDate(iso);
-  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+  const [, year, month, day, hour, minute] = match;
+  const dateValue = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)),
+  );
+  if (
+    dateValue.getUTCFullYear() !== Number(year) ||
+    dateValue.getUTCMonth() !== Number(month) - 1 ||
+    dateValue.getUTCDate() !== Number(day) ||
+    dateValue.getUTCHours() !== Number(hour) ||
+    dateValue.getUTCMinutes() !== Number(minute)
+  ) {
+    return 'Indisponível';
+  }
+
+  const parts = Object.fromEntries(
+    dateTimeFormatter
+      .formatToParts(dateValue)
+      .map(({ type, value: partValue }) => [type, partValue]),
+  );
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
 }
