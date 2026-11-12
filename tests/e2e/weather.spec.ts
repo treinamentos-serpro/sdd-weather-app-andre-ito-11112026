@@ -1,76 +1,153 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-const geocoding = {
-  results: [
-    {
-      id: 1,
-      name: 'Seattle',
-      country: 'Estados Unidos',
-      admin1: 'Washington',
-      latitude: 47.6,
-      longitude: -122.33,
-    },
-  ],
-};
+test('busca uma cidade e alterna a temperatura na previsão de cinco dias', async ({ page }) => {
+  await page.route('https://geocoding-api.open-meteo.com/v1/search?*', async (route) => {
+    await route.fulfill({
+      json: {
+        results: [
+          {
+            id: 3448439,
+            name: 'São Paulo',
+            latitude: -23.55,
+            longitude: -46.63,
+            admin1: 'São Paulo',
+            country: 'Brasil',
+            country_code: 'BR',
+            timezone: 'America/Sao_Paulo',
+          },
+        ],
+      },
+    });
+  });
 
-const forecast = {
-  current: {
-    time: '2026-06-16T12:00',
-    temperature_2m: 0,
-    relative_humidity_2m: 80,
-    wind_speed_10m: 10,
-    surface_pressure: 1015,
-    precipitation: 0,
-    weather_code: 3,
-  },
-  daily: {
-    time: ['2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19', '2026-06-20'],
-    weather_code: [3, 61, 80, 1, 0],
-    temperature_2m_max: [20, 19, 22, 24, 25],
-    temperature_2m_min: [12, 11, 13, 14, 15],
-    precipitation_probability_max: [20, 90, 70, 10, 0],
-  },
-};
+  await page.route('https://api.open-meteo.com/v1/forecast?*', async (route) => {
+    await route.fulfill({
+      json: {
+        timezone: 'America/Sao_Paulo',
+        current: {
+          time: '2026-11-11T12:00',
+          temperature_2m: 0,
+          apparent_temperature: -1,
+          relative_humidity_2m: 70,
+          weather_code: 3,
+          wind_speed_10m: 10,
+        },
+        daily: {
+          time: ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'],
+          temperature_2m_min: [0, 1, 2, 3, 4],
+          temperature_2m_max: [10, 11, 12, 13, 14],
+          weather_code: [3, 1, 2, 61, 0],
+          precipitation_probability_max: [20, 10, 30, 70, 0],
+        },
+      },
+    });
+  });
 
-async function mockApis(page: Page) {
-  await page.route('**/geocoding-api.open-meteo.com/**', (route) =>
-    route.fulfill({ json: geocoding }),
-  );
-  await page.route('**/api.open-meteo.com/**', (route) => route.fulfill({ json: forecast }));
-}
-
-test('fluxo completo: buscar → clima atual → previsão → trocar unidade', async ({ page }) => {
-  await mockApis(page);
   await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
+  await page.getByRole('button', { name: 'Buscar' }).click();
 
-  await page.getByLabel(/buscar cidade/i).fill('Seattle');
-  await page.getByRole('button', { name: /buscar/i }).click();
+  const currentWeather = page.getByRole('region', { name: 'Clima atual em São Paulo' });
+  await expect(currentWeather.getByRole('heading', { name: 'São Paulo' })).toBeVisible();
+  await expect(currentWeather.getByText('0,0 °C')).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Seattle' })).toBeVisible();
-  await expect(page.getByRole('region', { name: /previsão de 5 dias/i })).toBeVisible();
+  const forecast = page.getByRole('region', { name: 'Previsão de 5 dias' });
+  await expect(forecast).toBeVisible();
+  await expect(forecast.getByRole('article')).toHaveCount(5);
 
-  // 0°C exibido; após trocar para °F deve virar 32°.
-  await expect(page.getByText('0°').first()).toBeVisible();
-  await page.getByRole('button', { name: '°F' }).click();
-  await expect(page.getByText('32°').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Fahrenheit' }).click();
+  await expect(currentWeather.getByText('32,0 °F')).toBeVisible();
+  await expect(forecast.getByText('32,0 °F')).toBeVisible();
 });
 
-test('estado vazio quando a cidade não existe', async ({ page }) => {
-  await page.route('**/geocoding-api.open-meteo.com/**', (route) => route.fulfill({ json: {} }));
+test('exibe mensagem de cidade não encontrada quando results está ausente', async ({ page }) => {
+  let forecastRequests = 0;
+  await page.route('https://geocoding-api.open-meteo.com/v1/search?*', async (route) => {
+    await route.fulfill({ json: {} });
+  });
+  await page.route('https://api.open-meteo.com/v1/forecast?*', async (route) => {
+    forecastRequests += 1;
+    await route.abort();
+  });
+
   await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Cidade' }).fill('Cidade sem resultado');
+  await page.getByRole('button', { name: 'Buscar' }).click();
 
-  await page.getByLabel(/buscar cidade/i).fill('xyzxyz');
-  await page.getByRole('button', { name: /buscar/i }).click();
-
-  await expect(page.getByText(/nenhuma cidade encontrada/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Nenhuma cidade encontrada' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Cidade' })).toHaveValue('Cidade sem resultado');
+  expect(forecastRequests).toBe(0);
 });
 
-test('viewport mobile renderiza o fluxo principal', async ({ page }) => {
-  await mockApis(page);
+test('renderiza clima e previsão no viewport mobile', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/');
+  await page.route('https://geocoding-api.open-meteo.com/v1/search?*', async (route) => {
+    await route.fulfill({
+      json: {
+        results: [{ name: 'São Paulo', latitude: -23.55, longitude: -46.63 }],
+      },
+    });
+  });
+  await page.route('https://api.open-meteo.com/v1/forecast?*', async (route) => {
+    await route.fulfill({
+      json: {
+        timezone: 'America/Sao_Paulo',
+        current: { time: '2026-11-11T12:00', temperature_2m: 0, weather_code: 3 },
+        daily: {
+          time: ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'],
+          temperature_2m_min: [0, 1, 2, 3, 4],
+          temperature_2m_max: [10, 11, 12, 13, 14],
+          weather_code: [3, 1, 2, 61, 0],
+          precipitation_probability_max: [20, 10, 30, 70, 0],
+        },
+      },
+    });
+  });
 
-  await page.getByLabel(/buscar cidade/i).fill('Seattle');
-  await page.getByRole('button', { name: /buscar/i }).click();
-  await expect(page.getByRole('heading', { name: 'Seattle' })).toBeVisible();
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  const currentWeather = page.getByRole('region', { name: 'Clima atual em São Paulo' });
+  await expect(currentWeather.getByRole('heading', { name: 'São Paulo' })).toBeVisible();
+  await expect(currentWeather.getByText('0,0 °C')).toBeVisible();
+  const forecast = page.getByRole('region', { name: 'Previsão de 5 dias' });
+  await expect(forecast.getByRole('article')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Fahrenheit' }).click();
+  await expect(currentWeather.getByText('32,0 °F')).toBeVisible();
+});
+
+test('exibe previsão incompleta sem fabricar medições ou dias', async ({ page }) => {
+  await page.route('https://geocoding-api.open-meteo.com/v1/search?*', async (route) => {
+    await route.fulfill({
+      json: { results: [{ name: 'São Paulo', latitude: -23.55, longitude: -46.63 }] },
+    });
+  });
+  await page.route('https://api.open-meteo.com/v1/forecast?*', async (route) => {
+    await route.fulfill({
+      json: {
+        timezone: 'America/Sao_Paulo',
+        current: { time: '2026-11-11T12:00', temperature_2m: 20, weather_code: 3 },
+        daily: {
+          time: ['2026-11-11', '2026-11-12'],
+          temperature_2m_min: [null, 12],
+          temperature_2m_max: [25],
+          precipitation_probability_max: [0, null],
+          weather_code: [null, 3],
+        },
+      },
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
+  await page.getByRole('button', { name: 'Buscar' }).click();
+  const forecast = page.getByRole('region', { name: 'Previsão de 5 dias' });
+  await expect(forecast.getByText('Previsão incompleta.')).toBeVisible();
+  const days = forecast.getByRole('article');
+  await expect(days).toHaveCount(2);
+  await expect(days.nth(0).getByText('25,0 °C')).toBeVisible();
+  await expect(days.nth(0).getByText('0%')).toBeVisible();
+  await expect(days.nth(0).getByText('Indisponível', { exact: true })).toBeVisible();
+  await expect(days.nth(1).getByText('Indisponível', { exact: true })).toHaveCount(2);
 });
