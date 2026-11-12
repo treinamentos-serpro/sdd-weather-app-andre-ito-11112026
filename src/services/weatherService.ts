@@ -86,10 +86,10 @@ export async function searchCities(name: string): Promise<City[]> {
   const data = await fetchWithTimeout(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=pt&format=json`,
   );
-  if (!isRecord(data) || !('results' in data)) {
+  if (!isRecord(data)) {
     throw new WeatherServiceError('Resposta de geocodificação inválida.');
   }
-  if (data.results == null) return [];
+  if (!('results' in data) || data.results == null) return [];
   if (!Array.isArray(data.results)) {
     throw new WeatherServiceError('Resposta de geocodificação inválida.');
   }

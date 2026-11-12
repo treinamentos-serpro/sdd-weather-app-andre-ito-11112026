@@ -71,21 +71,18 @@ describe('searchCities', () => {
     expect(fetchMock.mock.calls[0][0]).toContain(encodeURIComponent(query));
   });
 
-  it('returns an empty list for valid no-match responses', async () => {
+  it('returns an empty list when results is missing, null or empty', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({ results: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ results: null }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(searchCities('cidade')).resolves.toEqual([]);
     await expect(searchCities('cidade')).resolves.toEqual([]);
-  });
-
-  it('rejects a geocoding response without a results field', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
-    await expect(searchCities('cidade')).rejects.toBeInstanceOf(WeatherServiceError);
+    await expect(searchCities('cidade')).resolves.toEqual([]);
   });
 
   it('handles null results and omits unavailable city fields', async () => {
