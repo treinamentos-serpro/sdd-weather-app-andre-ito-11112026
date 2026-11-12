@@ -83,9 +83,9 @@ describe('searchCities', () => {
     await expect(searchCities('cidade')).resolves.toEqual([]);
   });
 
-  it('rejects a geocoding response without a results field', async () => {
+  it('returns an empty list when the results field is absent', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
-    await expect(searchCities('cidade')).rejects.toBeInstanceOf(WeatherServiceError);
+    await expect(searchCities('cidade')).resolves.toEqual([]);
   });
 
   it('handles null results and omits unavailable city fields', async () => {

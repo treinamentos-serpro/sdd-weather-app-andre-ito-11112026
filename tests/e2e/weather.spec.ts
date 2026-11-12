@@ -46,6 +46,7 @@ test('busca uma cidade e alterna a temperatura na previsão de cinco dias', asyn
   await page.goto('/');
   await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
   await page.getByRole('button', { name: 'Buscar' }).click();
+  await page.getByRole('button', { name: /São Paulo/ }).click();
 
   const currentWeather = page.getByRole('region', { name: 'Clima atual em São Paulo' });
   await expect(currentWeather.getByRole('heading', { name: 'São Paulo' })).toBeVisible();
@@ -107,6 +108,7 @@ test('renderiza clima e previsão no viewport mobile', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
   await page.getByRole('button', { name: 'Buscar' }).click();
+  await page.getByRole('button', { name: /São Paulo/ }).click();
 
   const currentWeather = page.getByRole('region', { name: 'Clima atual em São Paulo' });
   await expect(currentWeather.getByRole('heading', { name: 'São Paulo' })).toBeVisible();
@@ -142,6 +144,7 @@ test('exibe previsão incompleta sem fabricar medições ou dias', async ({ page
   await page.goto('/');
   await page.getByRole('searchbox', { name: 'Cidade' }).fill('São Paulo');
   await page.getByRole('button', { name: 'Buscar' }).click();
+  await page.getByRole('button', { name: /São Paulo/ }).click();
   const forecast = page.getByRole('region', { name: 'Previsão de 5 dias' });
   await expect(forecast.getByText('Previsão incompleta.')).toBeVisible();
   const days = forecast.getByRole('article');
